@@ -26,6 +26,7 @@ This template provides a starter project for creating MCP plugins that run as We
 ### Prerequisites
 
 - Go 1.22 or later
+- TinyGo 0.40 or later
 - Docker (for building WASM)
 - `clang` and `lld` (for WASM compilation)
 
