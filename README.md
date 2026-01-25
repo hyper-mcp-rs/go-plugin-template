@@ -10,13 +10,14 @@ This template provides a starter project for creating MCP plugins that run as We
 
 ```
 .
-├── main.go                 # Plugin handler implementations
+├── .github/workflows       # Sample workflows for Github Actions
+|-- main.go                 # Plugin handler implementations
 ├── exports.go              # WASM export wrappers for handlers
 ├── imports.go              # Host function calls
 ├── types.go                # MCP protocol types
 ├── go.mod                  # Go module definition
 ├── go.sum                  # Go module checksums
-├── Dockerfile              # Multi-stage build for compiling to WASM
+├── Dockerfile              # Simple build for deploying a WASM
 └── .gitignore              # Git ignore rules
 ```
 
