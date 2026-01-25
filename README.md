@@ -51,8 +51,8 @@ Plugin handlers must be implemented without the use of goroutines *unless* you m
 
 3. **Build locally** (requires Docker for WASM target):
    ```sh
-   docker build -t your-plugin-name .
-   docker run --rm -v $(pwd):/workspace your-plugin-name cp /plugin.wasm /workspace/
+    GOOS=wasip1 GOARCH=wasm tinygo build -no-debug -panic=trap -scheduler=none -o plugin.wasm
+    docker build -t your-registry/your-plugin-name .
    ```
 
 ### Dependencies
@@ -286,11 +286,11 @@ func CallTool(input CallToolRequest) (*CallToolResult, error) {
 
 ### Using Docker
 
-The included `Dockerfile` provides a multi-stage build that compiles your plugin to WebAssembly:
+The included `Dockerfile` simply encapsulates your WASM:
 
 ```sh
+GOOS=wasip1 GOARCH=wasm tinygo build -no-debug -panic=trap -scheduler=none -o plugin.wasm
 docker build -t your-registry/your-plugin-name .
-docker run --rm -v $(pwd):/workspace your-registry/your-plugin-name cp /plugin.wasm /workspace/
 ```
 
 The Docker build:
@@ -300,11 +300,11 @@ The Docker build:
 
 ### Manual Build
 
-To build manually without Docker (requires Go 1.22+):
+To build manually without Docker (requires TinyGo 0.40+):
 
 ```sh
 # Build for WASM
-GOOS=wasip1 GOARCH=wasm CGO_ENABLED=0 go build -o plugin.wasm ./
+GOOS=wasip1 GOARCH=wasm tinygo build -no-debug -panic=trap -scheduler=none -o plugin.wasm
 
 # Result is at: plugin.wasm
 ```
