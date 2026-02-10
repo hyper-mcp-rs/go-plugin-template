@@ -1,7 +1,9 @@
 package main
 
 import (
+	"bytes"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 )
@@ -279,35 +281,193 @@ type CreateMessageResult struct {
 
 type CreateMessageResultContent SamplingMessage
 
-// ElicitRequestParamWithTimeout represents a request for user elicitation
-type ElicitRequestParamWithTimeout struct {
-	Message         string `json:"message"`
-	RequestedSchema Schema `json:"requestedSchema"`
-	Timeout         *int64 `json:"timeout,omitempty"`
-}
-
-// ElicitResult represents the result of an elicitation
-type ElicitResult struct {
-	Action  ElicitResultAction                  `json:"action"`
-	Content map[string]ElicitResultContentValue `json:"content,omitempty"`
-}
-
-// ElicitResultAction represents the action taken in elicitation
-type ElicitResultAction string
+type Mode string
 
 const (
-	Accept  ElicitResultAction = "accept"
-	Cancel  ElicitResultAction = "cancel"
-	Decline ElicitResultAction = "decline"
+	ModeForm Mode = "form"
+	ModeURL  Mode = "url"
 )
 
-func (e *ElicitResultAction) UnmarshalJSON(data []byte) error {
+type FormElicitationRequestParam struct {
+	Message         string `json:"message"`
+	RequestedSchema Schema `json:"requestedSchema"`
+}
+
+func (FormElicitationRequestParam) Mode() Mode                 { return ModeForm }
+func (FormElicitationRequestParam) isElicitationRequestParam() {}
+
+type URLElicitationRequestParam struct {
+	ElicitationID string `json:"elicitationId"`
+	Message       string `json:"message"`
+	URL           string `json:"url"`
+}
+
+func (URLElicitationRequestParam) Mode() Mode                 { return ModeURL }
+func (URLElicitationRequestParam) isElicitationRequestParam() {}
+
+// ElicitationRequestParam is an interface implemented by all variants.
+// This mirrors your Rust enum.
+type ElicitationRequestParam interface {
+	Mode() Mode
+	isElicitationRequestParam()
+}
+
+// ElicitationRequestParamWithTimeout represents a request for user elicitation
+type ElicitationRequestParamWithTimeout struct {
+	Inner   ElicitationRequestParam
+	Timeout *int64
+}
+
+func (w ElicitationRequestParamWithTimeout) MarshalJSON() ([]byte, error) {
+	if w.Inner == nil {
+		w.Inner = FormElicitationRequestParam{
+			Message:         "",
+			RequestedSchema: Schema{},
+		}
+	}
+
+	// Start with the mode tag.
+	m := map[string]any{
+		"mode": string(w.Inner.Mode()),
+	}
+
+	// Merge variant fields.
+	var variantBytes []byte
+	var err error
+	switch v := w.Inner.(type) {
+	case FormElicitationRequestParam:
+		variantBytes, err = json.Marshal(v)
+	case *FormElicitationRequestParam:
+		variantBytes, err = json.Marshal(v)
+	case URLElicitationRequestParam:
+		variantBytes, err = json.Marshal(v)
+	case *URLElicitationRequestParam:
+		variantBytes, err = json.Marshal(v)
+	default:
+		return nil, fmt.Errorf("unknown Inner type %T", w.Inner)
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	var variantMap map[string]any
+	if err := json.Unmarshal(variantBytes, &variantMap); err != nil {
+		return nil, err
+	}
+	for k, val := range variantMap {
+		// Prevent collisions with "mode" (shouldn't happen if your structs don't include it)
+		if k == "mode" {
+			continue
+		}
+		m[k] = val
+	}
+
+	// Add timeout (skip if nil, matching skip_serializing_if)
+	if w.Timeout != nil {
+		m["timeout"] = *w.Timeout
+	}
+
+	return json.Marshal(m)
+}
+
+// UnmarshalJSON reads the flat object, inspects "mode", then decodes into the right variant.
+// It also extracts timeout if present.
+func (w *ElicitationRequestParamWithTimeout) UnmarshalJSON(data []byte) error {
+	// Decode into a generic map so we can inspect mode and pluck timeout.
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	// Mode is required for the union.
+	modeRaw, ok := raw["mode"]
+	if !ok {
+		return errors.New(`missing required field "mode"`)
+	}
+	var mode string
+	if err := json.Unmarshal(modeRaw, &mode); err != nil {
+		return fmt.Errorf(`invalid "mode": %w`, err)
+	}
+
+	// Timeout is optional.
+	if tRaw, ok := raw["timeout"]; ok {
+		var t int64
+		if err := json.Unmarshal(tRaw, &t); err != nil {
+			return fmt.Errorf(`invalid "timeout": %w`, err)
+		}
+		w.Timeout = &t
+	} else {
+		w.Timeout = nil
+	}
+
+	// Remove wrapper-only fields so we can decode the remainder into the variant struct.
+	delete(raw, "timeout")
+	// Keep "mode" out of variant decoding; variant structs don't include it.
+	delete(raw, "mode")
+
+	// Re-marshal remaining fields into JSON for variant decoding.
+	// (This is a common, reliable pattern.)
+	rest, err := json.Marshal(raw)
+	if err != nil {
+		return err
+	}
+
+	decode_non_empty := func(b []byte, dst any) error {
+		// Normalize whitespace
+		if len(bytes.TrimSpace(b)) == 0 {
+			return nil
+		}
+		return json.Unmarshal(b, dst)
+	}
+
+	switch Mode(mode) {
+	case ModeForm:
+		var v FormElicitationRequestParam
+		if err := decode_non_empty(rest, &v); err != nil {
+			return fmt.Errorf("decode form param: %w", err)
+		}
+		w.Inner = v
+		return nil
+
+	case ModeURL:
+		var v URLElicitationRequestParam
+		if err := decode_non_empty(rest, &v); err != nil {
+			return fmt.Errorf("decode url param: %w", err)
+		}
+		w.Inner = v
+		return nil
+
+	default:
+		return fmt.Errorf(`unknown mode %q`, mode)
+	}
+}
+
+type ElicitationResponseNotificationParam struct {
+	ElicitationID string `json:"elicitationId"`
+}
+
+// ElicitationResult represents the result of an elicitation
+type ElicitationResult struct {
+	Action  ElicitationResultAction                  `json:"action"`
+	Content map[string]ElicitationResultContentValue `json:"content,omitempty"`
+}
+
+// ElicitationResultAction represents the action taken in elicitation
+type ElicitationResultAction string
+
+const (
+	Accept  ElicitationResultAction = "accept"
+	Cancel  ElicitationResultAction = "cancel"
+	Decline ElicitationResultAction = "decline"
+)
+
+func (e *ElicitationResultAction) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
 	}
 
-	ea := ElicitResultAction(s)
+	ea := ElicitationResultAction(s)
 	if !ea.Valid() {
 		return fmt.Errorf("invalid ElicitResultAction %q", s)
 	}
@@ -316,7 +476,7 @@ func (e *ElicitResultAction) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (e ElicitResultAction) Valid() bool {
+func (e ElicitationResultAction) Valid() bool {
 	switch e {
 	case Accept, Cancel, Decline:
 		return true
@@ -325,13 +485,13 @@ func (e ElicitResultAction) Valid() bool {
 	}
 }
 
-type ElicitResultContentValue struct {
+type ElicitationResultContentValue struct {
 	String  *string
 	Number  *json.Number
 	Boolean *bool
 }
 
-func (v ElicitResultContentValue) MarshalJSON() ([]byte, error) {
+func (v ElicitationResultContentValue) MarshalJSON() ([]byte, error) {
 	switch {
 	case v.String != nil:
 		return json.Marshal(v.String)
@@ -344,9 +504,9 @@ func (v ElicitResultContentValue) MarshalJSON() ([]byte, error) {
 	}
 }
 
-func (v *ElicitResultContentValue) UnmarshalJSON(data []byte) error {
+func (v *ElicitationResultContentValue) UnmarshalJSON(data []byte) error {
 	// Clear existing values
-	*v = ElicitResultContentValue{}
+	*v = ElicitationResultContentValue{}
 
 	// Try string first
 	var s string

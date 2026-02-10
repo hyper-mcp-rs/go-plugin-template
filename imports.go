@@ -7,7 +7,7 @@ import pdk "github.com/extism/go-pdk"
 // Plugins can use this to ask users for input, decisions, or confirmations. This is useful for interactive plugins that need user guidance during tool execution. Returns the user's response with action and optional form data.
 // It takes input of CreateElicitationRequestParamWithTimeout ()
 // And it returns an output *CreateElicitationResult ()
-func CreateElicitation(input ElicitRequestParamWithTimeout) (*ElicitResult, error) {
+func CreateElicitation(input ElicitationRequestParamWithTimeout) (*ElicitationResult, error) {
 	var err error
 	_ = err
 	mem, err := pdk.AllocateJSON(&input)
@@ -17,7 +17,7 @@ func CreateElicitation(input ElicitRequestParamWithTimeout) (*ElicitResult, erro
 
 	offs := _CreateElicitation(mem.Offset())
 
-	var out ElicitResult
+	var out ElicitationResult
 	err = pdk.JSONFrom(offs, &out)
 	if err != nil {
 		return nil, err
@@ -158,6 +158,24 @@ func NotifyToolListChanged() error {
 
 }
 
+// NotifyResourceUpdated Notify the client that a specific resource has been updated.
+//
+// Plugins should call this when they modify the contents of a resource. The client can use this to invalidate caches and refresh resource displays.
+// It takes input of ResourceUpdatedNotificationParam ()
+func NotifyUrlElicitationCompleted(input ElicitationResponseNotificationParam) error {
+	var err error
+	_ = err
+	mem, err := pdk.AllocateJSON(&input)
+	if err != nil {
+		return err
+	}
+
+	_NotifyUrlElicitationCompleted(mem.Offset())
+
+	return nil
+
+}
+
 //go:wasmimport extism:host/user create_elicitation
 func _CreateElicitation(uint64) uint64
 
@@ -184,3 +202,6 @@ func _NotifyResourceUpdated(uint64)
 
 //go:wasmimport extism:host/user notify_tool_list_changed
 func _NotifyToolListChanged()
+
+//go:wasmimport extism:host/user notify_resource_updated
+func _NotifyUrlElicitationCompleted(uint64)
