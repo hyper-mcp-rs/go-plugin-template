@@ -1,6 +1,8 @@
 package main
 
-import pdk "github.com/extism/go-pdk"
+import (
+	pdk "github.com/extism/go-pdk"
+)
 
 // CreateElicitation Request user input through the client's elicitation interface.
 //
@@ -11,6 +13,7 @@ func CreateElicitation(input ElicitationRequestParamWithTimeout) (*ElicitationRe
 	var err error
 	_ = err
 	mem, err := pdk.AllocateJSON(&input)
+	defer mem.Free()
 	if err != nil {
 		return nil, err
 	}
@@ -35,6 +38,7 @@ func CreateMessage(input CreateMessageRequestParam) (*CreateMessageResult, error
 	var err error
 	_ = err
 	mem, err := pdk.AllocateJSON(&input)
+	defer mem.Free()
 	if err != nil {
 		return nil, err
 	}
@@ -48,6 +52,21 @@ func CreateMessage(input CreateMessageRequestParam) (*CreateMessageResult, error
 	}
 	return &out, nil
 
+}
+
+func GetKeyringSecret(input KeyringEntryId) ([]byte, error) {
+	var err error
+	_ = err
+	mem, err := pdk.AllocateJSON(&input)
+	defer mem.Free()
+	if err != nil {
+		return nil, err
+	}
+
+	offs := _GetKeyringSecret(mem.Offset())
+
+	mem2 := pdk.FindMemory(offs)
+	return mem2.ReadBytes(), nil
 }
 
 // ListRoots List the client's root directories or resources.
@@ -76,6 +95,7 @@ func NotifyLoggingMessage(input LoggingMessageNotificationParam) error {
 	var err error
 	_ = err
 	mem, err := pdk.AllocateJSON(&input)
+	defer mem.Free()
 	if err != nil {
 		return err
 	}
@@ -94,6 +114,7 @@ func NotifyProgress(input ProgressNotificationParam) error {
 	var err error
 	_ = err
 	mem, err := pdk.AllocateJSON(&input)
+	defer mem.Free()
 	if err != nil {
 		return err
 	}
@@ -136,6 +157,7 @@ func NotifyResourceUpdated(input ResourceUpdatedNotificationParam) error {
 	var err error
 	_ = err
 	mem, err := pdk.AllocateJSON(&input)
+	defer mem.Free()
 	if err != nil {
 		return err
 	}
@@ -166,6 +188,7 @@ func NotifyUrlElicitationCompleted(input ElicitationResponseNotificationParam) e
 	var err error
 	_ = err
 	mem, err := pdk.AllocateJSON(&input)
+	defer mem.Free()
 	if err != nil {
 		return err
 	}
@@ -181,6 +204,9 @@ func _CreateElicitation(uint64) uint64
 
 //go:wasmimport extism:host/user create_message
 func _CreateMessage(uint64) uint64
+
+//go:wasmimport extism:host/usr get_keyring_secret
+func _GetKeyringSecret(uint64) uint64
 
 //go:wasmimport extism:host/user list_roots
 func _ListRoots() uint64
@@ -203,5 +229,5 @@ func _NotifyResourceUpdated(uint64)
 //go:wasmimport extism:host/user notify_tool_list_changed
 func _NotifyToolListChanged()
 
-//go:wasmimport extism:host/user notify_resource_updated
+//go:wasmimport extism:host/user notify_url_elicitation_completed
 func _NotifyUrlElicitationCompleted(uint64)
