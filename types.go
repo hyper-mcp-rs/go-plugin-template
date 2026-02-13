@@ -232,22 +232,33 @@ type CreateMessageRequestParam struct {
 	IncludeContext   *CreateMessageRequestParamIncludeContext `json:"includeContext,omitempty"`
 	MaxTokens        int64                                    `json:"maxTokens"`
 	Messages         []SamplingMessage                        `json:"messages"`
+	Metadata         any                                      `json:"metadata,omitempty"`
 	ModelPreferences *ModelPreferences                        `json:"modelPreferences,omitempty"`
 	StopSequences    []string                                 `json:"stopSequences,omitempty"`
 	SystemPrompt     *string                                  `json:"systemPrompt,omitempty"`
+	Task             map[string]any                           `json:"task,omitempty"`
 	Temperature      *float64                                 `json:"temperature,omitempty"`
+	ToolChoice       *ToolChoice                              `json:"toolChoice,omitempty"`
+	Tools            []Tool                                   `json:"tools,omitempty"`
 }
 
 // CreateMessageRequestParamIncludeContext represents context inclusion options
 type CreateMessageRequestParamIncludeContext string
 
 const (
-	AllServers CreateMessageRequestParamIncludeContext = "allServers"
-	None       CreateMessageRequestParamIncludeContext = "none"
-	ThisServer CreateMessageRequestParamIncludeContext = "thisServer"
+	CreateMessageRequestParamIncludeContextAllServers CreateMessageRequestParamIncludeContext = "allServers"
+	CreateMessageRequestParamIncludeContextNone       CreateMessageRequestParamIncludeContext = "none"
+	CreateMessageRequestParamIncludeContextThisServer CreateMessageRequestParamIncludeContext = "thisServer"
 )
 
-func (t *CreateMessageRequestParamIncludeContext) UnmarshalJSON(data []byte) error {
+func (e CreateMessageRequestParamIncludeContext) MarshallJSON() ([]byte, error) {
+	if !e.Valid() {
+		return nil, fmt.Errorf("invalid CreateMessageRequestParamIncludeContext: %q", e)
+	}
+	return json.Marshal(string(e))
+}
+
+func (e *CreateMessageRequestParamIncludeContext) UnmarshalJSON(data []byte) error {
 	var s string
 	if err := json.Unmarshal(data, &s); err != nil {
 		return err
@@ -258,13 +269,13 @@ func (t *CreateMessageRequestParamIncludeContext) UnmarshalJSON(data []byte) err
 		return fmt.Errorf("invalid CreateMessageRequestParamIncludeContext %q", s)
 	}
 
-	*t = ct
+	*e = ct
 	return nil
 }
 
-func (t CreateMessageRequestParamIncludeContext) Valid() bool {
-	switch t {
-	case AllServers, None, ThisServer:
+func (e CreateMessageRequestParamIncludeContext) Valid() bool {
+	switch e {
+	case CreateMessageRequestParamIncludeContextAllServers, CreateMessageRequestParamIncludeContextNone, CreateMessageRequestParamIncludeContextThisServer:
 		return true
 	default:
 		return false
@@ -456,10 +467,17 @@ type ElicitationResult struct {
 type ElicitationResultAction string
 
 const (
-	Accept  ElicitationResultAction = "accept"
-	Cancel  ElicitationResultAction = "cancel"
-	Decline ElicitationResultAction = "decline"
+	ElicitationResultActionAccept  ElicitationResultAction = "accept"
+	ElicitationResultActionCancel  ElicitationResultAction = "cancel"
+	ElicitationResultActionDecline ElicitationResultAction = "decline"
 )
+
+func (e ElicitationResultAction) MarshallJSON() ([]byte, error) {
+	if !e.Valid() {
+		return nil, fmt.Errorf("invalid ElicitationResultAction: %q", e)
+	}
+	return json.Marshal(string(e))
+}
 
 func (e *ElicitationResultAction) UnmarshalJSON(data []byte) error {
 	var s string
@@ -478,7 +496,7 @@ func (e *ElicitationResultAction) UnmarshalJSON(data []byte) error {
 
 func (e ElicitationResultAction) Valid() bool {
 	switch e {
-	case Accept, Cancel, Decline:
+	case ElicitationResultActionAccept, ElicitationResultActionCancel, ElicitationResultActionDecline:
 		return true
 	default:
 		return false
@@ -667,6 +685,11 @@ func (i *ImageContent) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
+type KeyringEntryId struct {
+	Service string `json:"service"`
+	User    string `json:"user"`
+}
+
 // ListPromptsRequest represents a request to list prompts
 type ListPromptsRequest struct {
 	Context PluginRequestContext `json:"context"`
@@ -716,15 +739,22 @@ type ListToolsResult struct {
 type LoggingLevel string
 
 const (
-	Debug     LoggingLevel = "debug"
-	Info      LoggingLevel = "info"
-	Notice    LoggingLevel = "notice"
-	Warning   LoggingLevel = "warning"
-	Error     LoggingLevel = "error"
-	Critical  LoggingLevel = "critical"
-	Alert     LoggingLevel = "alert"
-	Emergency LoggingLevel = "emergency"
+	LoggingLevelDebug     LoggingLevel = "debug"
+	LoggingLevelInfo      LoggingLevel = "info"
+	LoggingLevelNotice    LoggingLevel = "notice"
+	LoggingLevelWarning   LoggingLevel = "warning"
+	LoggingLevelError     LoggingLevel = "error"
+	LoggingLevelCritical  LoggingLevel = "critical"
+	LoggingLevelAlert     LoggingLevel = "alert"
+	LoggingLevelEmergency LoggingLevel = "emergency"
 )
+
+func (l LoggingLevel) MarshallJSON() ([]byte, error) {
+	if !l.Valid() {
+		return nil, fmt.Errorf("invalid LoggingLevel: %q", l)
+	}
+	return json.Marshal(string(l))
+}
 
 func (l *LoggingLevel) UnmarshalJSON(data []byte) error {
 	var s string
@@ -733,7 +763,7 @@ func (l *LoggingLevel) UnmarshalJSON(data []byte) error {
 	}
 
 	ll := LoggingLevel(s)
-	if !ll.Validate() {
+	if !ll.Valid() {
 		return fmt.Errorf("invalid LoggingLevel %q", s)
 	}
 
@@ -741,9 +771,9 @@ func (l *LoggingLevel) UnmarshalJSON(data []byte) error {
 	return nil
 }
 
-func (l LoggingLevel) Validate() bool {
+func (l LoggingLevel) Valid() bool {
 	switch l {
-	case Debug, Info, Notice, Warning, Error, Critical, Alert, Emergency:
+	case LoggingLevelDebug, LoggingLevelInfo, LoggingLevelNotice, LoggingLevelWarning, LoggingLevelError, LoggingLevelCritical, LoggingLevelAlert, LoggingLevelEmergency:
 		return true
 	default:
 		return false
@@ -786,9 +816,16 @@ type NumberSchema struct {
 type NumberType string
 
 const (
-	Number  NumberType = "number"
-	Integer NumberType = "integer"
+	NumberTypeNumber  NumberType = "number"
+	NumberTypeInteger NumberType = "integer"
 )
+
+func (n NumberType) MarshallJSON() ([]byte, error) {
+	if !n.Valid() {
+		return nil, fmt.Errorf("invalid NumberType: %q", n)
+	}
+	return json.Marshal(string(n))
+}
 
 func (n *NumberType) UnmarshalJSON(data []byte) error {
 	var s string
@@ -807,7 +844,7 @@ func (n *NumberType) UnmarshalJSON(data []byte) error {
 
 func (n NumberType) Valid() bool {
 	switch n {
-	case Number, Integer:
+	case NumberTypeNumber, NumberTypeInteger:
 		return true
 	default:
 		return false
@@ -1193,9 +1230,16 @@ type ResourceUpdatedNotificationParam struct {
 type Role string
 
 const (
-	Assistant Role = "assistant"
-	User      Role = "user"
+	RoleAssistant Role = "assistant"
+	RoleUser      Role = "user"
 )
+
+func (r Role) MarshallJSON() ([]byte, error) {
+	if !r.Valid() {
+		return nil, fmt.Errorf("invalid Role: %q", r)
+	}
+	return json.Marshal(string(r))
+}
 
 func (r *Role) UnmarshalJSON(data []byte) error {
 	var s string
@@ -1214,7 +1258,7 @@ func (r *Role) UnmarshalJSON(data []byte) error {
 
 func (r Role) Valid() bool {
 	switch r {
-	case Assistant, User:
+	case RoleAssistant, RoleUser:
 		return true
 	default:
 		return false
@@ -1367,6 +1411,13 @@ const (
 	DateTime StringSchemaFormat = "date_time"
 )
 
+func (s StringSchemaFormat) MarshallJSON() ([]byte, error) {
+	if !s.Valid() {
+		return nil, fmt.Errorf("invalid StringSchemaFormat: %q", s)
+	}
+	return json.Marshal(string(s))
+}
+
 func (s *StringSchemaFormat) UnmarshalJSON(data []byte) error {
 	var str string
 	if err := json.Unmarshal(data, &str); err != nil {
@@ -1395,7 +1446,6 @@ func (s StringSchemaFormat) Valid() bool {
 type TextContent struct {
 	Meta        Meta         `json:"_meta,omitempty"`
 	Annotations *Annotations `json:"annotations,omitempty"`
-	Text        string       `json:"text"`
 }
 
 func (t TextContent) MarshallJSON() ([]byte, error) {
@@ -1446,9 +1496,81 @@ type Tool struct {
 	Title        *string      `json:"title,omitempty"`
 }
 
+type ToolChoice struct {
+	Mode ToolChoiceMode `json:"mode,omitempty"`
+}
+
+type ToolChoiceMode string
+
+const (
+	ToolChoiceModeAuto     ToolChoiceMode = "auto"
+	ToolChoiceModeRequired ToolChoiceMode = "required"
+	ToolChoiceModeNone     ToolChoiceMode = "none"
+)
+
+func (t ToolChoiceMode) MarshallJSON() ([]byte, error) {
+	if !t.Valid() {
+		return nil, fmt.Errorf("invalid ToolChoiceMode: %q", t)
+	}
+	return json.Marshal(string(t))
+}
+
+func (t *ToolChoiceMode) UnmarshallJSON(data []byte) error {
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return err
+	}
+
+	tcm := ToolChoiceMode(str)
+	if !tcm.Valid() {
+		return fmt.Errorf("invalid ToolChoiceMode %q", str)
+	}
+
+	*t = tcm
+	return nil
+}
+
+func (t ToolChoiceMode) Valid() bool {
+	switch t {
+	case ToolChoiceModeAuto, ToolChoiceModeRequired, ToolChoiceModeNone:
+		return true
+	default:
+		return false
+	}
+}
+
 // ToolSchema represents the schema for tool input or output
 type ToolSchema struct {
 	Properties map[string]any `json:"properties,omitempty"`
 	Required   []string       `json:"required,omitempty"`
-	Type       string         `json:"type"` // "object"
+}
+
+func (t ToolSchema) MarshallJSON() ([]byte, error) {
+	type alias ToolSchema
+	return json.Marshal(&struct {
+		Type string `json:"type"`
+		alias
+	}{
+		Type:  "object",
+		alias: (alias)(t),
+	})
+}
+
+func (t *ToolSchema) UnmarshalJSON(data []byte) error {
+	type alias ToolSchema
+	aux := struct {
+		Type string `json:"type"`
+		alias
+	}{}
+
+	if err := json.Unmarshal(data, &aux); err != nil {
+		return err
+	}
+
+	if aux.Type != "object" && aux.Type != "" { // allow empty if missing
+		return fmt.Errorf("invalid type %q, expected \"object\"", aux.Type)
+	}
+
+	*t = ToolSchema(aux.alias)
+	return nil
 }
