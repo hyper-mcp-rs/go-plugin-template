@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"time"
+
+	"github.com/invopop/jsonschema"
 )
 
 // Annotations represents metadata annotations for resources and content
@@ -1488,12 +1490,20 @@ type TextResourceContents struct {
 
 // Tool represents a tool
 type Tool struct {
-	Annotations  *Annotations `json:"annotations,omitempty"`
-	Description  *string      `json:"description,omitempty"`
-	InputSchema  ToolSchema   `json:"inputSchema"`
-	Name         string       `json:"name"`
-	OutputSchema *ToolSchema  `json:"outputSchema,omitempty"`
-	Title        *string      `json:"title,omitempty"`
+	Annotations  *ToolAnnotations   `json:"annotations,omitempty"`
+	Description  *string            `json:"description,omitempty"`
+	InputSchema  jsonschema.Schema  `json:"inputSchema"`
+	Name         string             `json:"name"`
+	OutputSchema *jsonschema.Schema `json:"outputSchema,omitempty"`
+	Title        *string            `json:"title,omitempty"`
+}
+
+type ToolAnnotations struct {
+	DestructiveHint *bool   `json:"destructiveHint,omitempty"`
+	IdempotentHint  *bool   `json:"idempotentHint,omitempty"`
+	OpenWorldHint   *bool   `json:"openWorldHint,omitempty"`
+	ReadOnlyHint    *bool   `json:"readOnlyHint,omitempty"`
+	Title           *string `json:"title,omitempty"`
 }
 
 type ToolChoice struct {
@@ -1537,40 +1547,4 @@ func (t ToolChoiceMode) Valid() bool {
 	default:
 		return false
 	}
-}
-
-// ToolSchema represents the schema for tool input or output
-type ToolSchema struct {
-	Properties map[string]any `json:"properties,omitempty"`
-	Required   []string       `json:"required,omitempty"`
-}
-
-func (t ToolSchema) MarshallJSON() ([]byte, error) {
-	type alias ToolSchema
-	return json.Marshal(&struct {
-		Type string `json:"type"`
-		alias
-	}{
-		Type:  "object",
-		alias: (alias)(t),
-	})
-}
-
-func (t *ToolSchema) UnmarshalJSON(data []byte) error {
-	type alias ToolSchema
-	aux := struct {
-		Type string `json:"type"`
-		alias
-	}{}
-
-	if err := json.Unmarshal(data, &aux); err != nil {
-		return err
-	}
-
-	if aux.Type != "object" && aux.Type != "" { // allow empty if missing
-		return fmt.Errorf("invalid type %q, expected \"object\"", aux.Type)
-	}
-
-	*t = ToolSchema(aux.alias)
-	return nil
 }
