@@ -169,6 +169,17 @@ type CallToolResult struct {
 	StructuredContent map[string]any `json:"structuredContent,omitempty"`
 }
 
+// Error creates an error CallToolResult with the given message.
+func (CallToolResult) Error(msg string) CallToolResult {
+	isErr := true
+	return CallToolResult{
+		IsError: &isErr,
+		Content: []ContentBlock{
+			{Text: &TextContent{Text: msg}},
+		},
+	}
+}
+
 // CompleteRequest represents a request for completion suggestions
 type CompleteRequest struct {
 	Context PluginRequestContext `json:"context"`
@@ -1514,6 +1525,7 @@ type SystemTime struct {
 type TextContent struct {
 	Meta        Meta         `json:"_meta,omitempty"`
 	Annotations *Annotations `json:"annotations,omitempty"`
+	Text        string       `json:"text"`
 }
 
 func (t TextContent) MarshallJSON() ([]byte, error) {
