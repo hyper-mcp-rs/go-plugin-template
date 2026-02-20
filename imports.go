@@ -54,6 +54,31 @@ func CreateMessage(input CreateMessageRequestParam) (*CreateMessageResult, error
 
 }
 
+// GetAccessToken obtains an OAuth2 access token from the host.
+//
+// The host manages token acquisition, caching, and refresh. Pass in your
+// OauthCredentials and receive back an *AccessToken ready for use as a bearer
+// token, or nil if the token could not be obtained.
+func GetAccessToken(input OauthCredentials) (*AccessToken, error) {
+	var err error
+	_ = err
+	mem, err := pdk.AllocateJSON(&input)
+	defer mem.Free()
+	if err != nil {
+		return nil, err
+	}
+
+	offs := _GetAccessToken(mem.Offset())
+
+	var out *AccessToken
+	err = pdk.JSONFrom(offs, &out)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+
+}
+
 func GetKeyringSecret(input KeyringEntryId) ([]byte, error) {
 	var err error
 	_ = err
@@ -204,6 +229,9 @@ func _CreateElicitation(uint64) uint64
 
 //go:wasmimport extism:host/user create_message
 func _CreateMessage(uint64) uint64
+
+//go:wasmimport extism:host/user get_access_token
+func _GetAccessToken(uint64) uint64
 
 //go:wasmimport extism:host/usr get_keyring_secret
 func _GetKeyringSecret(uint64) uint64

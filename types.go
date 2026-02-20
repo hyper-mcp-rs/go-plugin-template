@@ -17,6 +17,53 @@ type Annotations struct {
 	Priority     float32    `json:"priority,omitempty"`
 }
 
+// AccessToken represents an OAuth2 access token returned by the host.
+// The host handles token acquisition, caching, and refresh transparently.
+type AccessToken struct {
+	AccessToken string      `json:"access_token"`
+	ExpiresAt   *SystemTime `json:"expires_at,omitempty"`
+	Scopes      []string    `json:"scopes,omitempty"`
+}
+
+// AuthType represents the client authentication method for the token endpoint.
+type AuthType string
+
+const (
+	AuthTypeRequestBody AuthType = "requestBody"
+	AuthTypeBasicAuth   AuthType = "basicAuth"
+)
+
+func (a AuthType) MarshalJSON() ([]byte, error) {
+	if !a.Valid() {
+		return nil, fmt.Errorf("invalid AuthType: %q", a)
+	}
+	return json.Marshal(string(a))
+}
+
+func (a *AuthType) UnmarshalJSON(data []byte) error {
+	var s string
+	if err := json.Unmarshal(data, &s); err != nil {
+		return err
+	}
+
+	at := AuthType(s)
+	if !at.Valid() {
+		return fmt.Errorf("invalid AuthType %q", s)
+	}
+
+	*a = at
+	return nil
+}
+
+func (a AuthType) Valid() bool {
+	switch a {
+	case AuthTypeRequestBody, AuthTypeBasicAuth:
+		return true
+	default:
+		return false
+	}
+}
+
 // AudioContent represents audio content in a message
 type AudioContent struct {
 	Meta        Meta         `json:"_meta,omitempty"`
@@ -853,6 +900,19 @@ func (n NumberType) Valid() bool {
 	}
 }
 
+// OauthCredentials contains the credentials needed to obtain an OAuth2 access token from the host.
+// Pass this to GetAccessToken and the host will return a cached or freshly-acquired AccessToken.
+type OauthCredentials struct {
+	AuthType               *AuthType         `json:"auth_type,omitempty"`
+	ClientID               string            `json:"client_id"`
+	ClientSecret           *string           `json:"client_secret,omitempty"`
+	DeviceAuthorizationURL *string           `json:"device_authorization_url,omitempty"`
+	DeviceAuthTimeoutSecs  *uint64           `json:"device_auth_timeout_secs,omitempty"`
+	ExtraParams            map[string]string `json:"extra_params,omitempty"`
+	Scopes                 []string          `json:"scopes,omitempty"`
+	TokenEndpointURL       string            `json:"token_endpoint_url"`
+}
+
 // PluginNotificationContext represents the context for a plugin notification
 type PluginNotificationContext struct {
 	Meta Meta `json:"meta"`
@@ -1442,6 +1502,12 @@ func (s StringSchemaFormat) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// SystemTime mirrors Rust's std::time::SystemTime serde representation.
+type SystemTime struct {
+	SecsSinceEpoch  uint64 `json:"secs_since_epoch"`
+	NanosSinceEpoch uint32 `json:"nanos_since_epoch"`
 }
 
 // TextContent represents text content
