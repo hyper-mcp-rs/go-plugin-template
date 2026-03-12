@@ -1033,11 +1033,47 @@ func (p *PrimitiveSchemaDefinition) UnmarshalJSON(data []byte) error {
 }
 
 // ProgressNotificationParam represents a progress notification
+type ProgressToken struct {
+	String *string
+	Number *int64
+}
+
+func (p ProgressToken) MarshalJSON() ([]byte, error) {
+	switch {
+	case p.String != nil:
+		return json.Marshal(p.String)
+	case p.Number != nil:
+		return json.Marshal(p.Number)
+	default:
+		return json.Marshal("")
+	}
+}
+
+func (p *ProgressToken) UnmarshalJSON(data []byte) error {
+	*p = ProgressToken{}
+
+	// Try string first
+	var s string
+	if err := json.Unmarshal(data, &s); err == nil {
+		p.String = &s
+		return nil
+	}
+
+	// Then number
+	var n int64
+	if err := json.Unmarshal(data, &n); err == nil {
+		p.Number = &n
+		return nil
+	}
+
+	return fmt.Errorf("ProgressToken: unsupported JSON value: %s", string(data))
+}
+
 type ProgressNotificationParam struct {
-	Message       *string  `json:"message,omitempty"`
-	Progress      float64  `json:"progress"`
-	ProgressToken string   `json:"progressToken"`
-	Total         *float64 `json:"total,omitempty"`
+	Message       *string       `json:"message,omitempty"`
+	Progress      float64       `json:"progress"`
+	ProgressToken ProgressToken `json:"progressToken"`
+	Total         *float64      `json:"total,omitempty"`
 }
 
 // Prompt represents a prompt
